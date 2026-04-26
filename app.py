@@ -37,7 +37,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 核心解析引擎庫
+# 核心解析引擎庫 (Engines)
 # ==========================================
 def parse_indentation(text):
     nodes_dict = {}
@@ -84,49 +84,65 @@ def parse_mermaid(text):
             for i in range(len(chain_ids) - 1): edges.append((chain_ids[i], chain_ids[i+1]))
     return nodes_dict, edges
 
-def parse_clinical(text):
-    nodes_dict = {"Root": {"label": "臨床鑑別與決策\nClinical Diagnosis & Decision", "type": "root"}}
+def parse_arrow_chain(text):
+    """全新：動態連續箭頭與智能語意解析引擎"""
+    nodes_dict = {}
     edges = []
-    current_l1 = current_l2 = last_disease_id = None
+    label_to_id = {}
     node_counter = 0
-    def get_id(prefix):
+
+    def get_or_create_node(label):
         nonlocal node_counter
-        node_counter += 1
-        return f"{prefix}_{node_counter}"
+        label = label.strip()
+        # 節點合併邏輯：看過一樣的字，就回傳舊 ID，不產生新框
+        if label not in label_to_id:
+            node_counter += 1
+            node_id = f"ARR_{node_counter}"
+            label_to_id[label] = node_id
+            
+            # 智能醫療特徵萃取 (上色邏輯)
+            node_type = "standard"
+            label_lower = label.lower()
+            
+            disease_kws = ["病", "炎", "症", "感染", "osis", "itis", "syndrome", "fever", "virus", "bacteria"]
+            treatment_kws = ["治療", "首選", "次選", "1st:", "2nd:", "penicillin", "mycin", "sporin", "藥", "支持", "support", "vaccine"]
+            
+            if any(kw in label_lower for kw in treatment_kws):
+                node_type = "treatment"
+            elif any(kw in label_lower for kw in disease_kws):
+                node_type = "disease"
+                
+            nodes_dict[node_id] = {"label": label, "type": node_type}
+        return label_to_id[label]
+
+    # 統一箭頭符號，提高寬容度
+    text = text.replace('->', '➔').replace('=>', '➔').replace('➡️', '➔')
+    
     for line in text.strip().split('\n'):
         line = line.strip()
         if not line: continue
-        if re.match(r'^\d+\.', line):
-            l1_id = get_id("L1")
-            nodes_dict[l1_id] = {"label": line, "type": "main"}
-            edges.append(("Root", l1_id))
-            current_l1, current_l2, last_disease_id = l1_id, None, None
-        elif '➔' in line:
+        
+        if '➔' in line:
             parts = line.split('➔')
-            sym_id, dis_id = get_id("SYM"), get_id("DIS")
-            nodes_dict[sym_id] = {"label": parts[0].strip(), "type": "symptom"}
-            nodes_dict[dis_id] = {"label": parts[1].strip(), "type": "disease"}
-            if current_l2: edges.append((current_l2, sym_id))
-            elif current_l1: edges.append((current_l1, sym_id))
-            edges.append((sym_id, dis_id))
-            last_disease_id = dis_id
-        elif any(line.startswith(kw) for kw in ["治療", "配伍", "禁忌"]):
-            trt_id = get_id("TRT")
-            nodes_dict[trt_id] = {"label": line, "type": "treatment"}
-            if last_disease_id: edges.append((last_disease_id, trt_id))
-            elif current_l2: edges.append((current_l2, trt_id))
-            elif current_l1: edges.append((current_l1, trt_id))
+            # 支援無限數量箭頭串接
+            for i in range(len(parts) - 1):
+                p_label = parts[i].strip()
+                c_label = parts[i+1].strip()
+                if not p_label or not c_label: continue
+                
+                p_id = get_or_create_node(p_label)
+                c_id = get_or_create_node(c_label)
+                
+                if (p_id, c_id) not in edges:
+                    edges.append((p_id, c_id))
         else:
-            if current_l1:
-                l2_id = get_id("L2")
-                nodes_dict[l2_id] = {"label": line, "type": "sub"}
-                edges.append((current_l1, l2_id))
-                current_l2, last_disease_id = l2_id, None
+            get_or_create_node(line)
+
     return nodes_dict, edges
 
 def auto_detect_and_parse(text):
     if '-->' in text or 'graph LR' in text or 'graph TB' in text: return parse_mermaid(text), "Mermaid 語法模式"
-    elif '➔' in text: return parse_clinical(text), "臨床醫學判別模式"
+    elif '➔' in text or '->' in text: return parse_arrow_chain(text), "連續推演引擎 (智能語意)"
     else: return parse_indentation(text), "空白縮排模式"
 
 def format_label_wrap(text, width):
@@ -144,7 +160,7 @@ col1, col2 = st.columns([1.2, 2.0], gap="large")
 with col1:
     with st.form("main_form", border=False):
         st.markdown("#### 📥 數據輸入區")
-        input_text = st.text_area("結構文字 (支援：空白縮排 / ➔ 臨床格式 / Mermaid 代碼)", height=350, placeholder="請在此貼上您的層級結構資料...")
+        input_text = st.text_area("結構文字 (支援：連續箭頭 A ➔ B ➔ C / 縮排 / Mermaid)", height=350, placeholder="請在此貼上您的層級結構資料...")
         
         with st.expander("⚙️ 進階渲染參數設定", expanded=False):
             d1, d2 = st.columns(2)
@@ -155,7 +171,6 @@ with col1:
             with s1: node_shape = st.radio("節點形狀", ["方框", "圓框", "無框"])
             with s2: density = st.radio("排版密度", ["緊密", "適中", "鬆散"])
             
-            # 新增字體選擇區塊
             font_choice = st.selectbox("字體設定", ["正黑體 (預設現代)", "明體 (正式學術)", "楷體 (傳統人文)"])
             wrap_width = st.slider("自動斷行字數限制 (字/行)", 5, 40, 15)
         
@@ -172,7 +187,6 @@ with col2:
                 (nodes_dict, edges), detected_mode = auto_detect_and_parse(text=input_text)
                 st.success(f"✓ 數據解析成功 | 系統判定格式：**{detected_mode}**")
 
-                # 參數映射
                 dir_map = {"橫式 (左至右)": "LR", "直式 (上至下)": "TB"}
                 line_map = {"直角折線": "ortho", "彎曲線條": "spline"}
                 shape_map = {"方框": "box", "圓框": "ellipse", "無框": "plaintext"}
@@ -187,7 +201,6 @@ with col2:
                     "楷體 (傳統人文)": "AR PL UKai TW"
                 }
 
-                # 建立 Graphviz
                 dot = graphviz.Digraph(format='png')
                 selected_shape = shape_map[node_shape]
                 selected_font = font_map[font_choice]
@@ -203,15 +216,12 @@ with col2:
                         dot.node(node_id, formatted_label, shape=selected_shape, style="filled", fillcolor="#ffcccc", fontname=selected_font, fontsize="12", color="#cc0000")
                     elif node_type == "treatment":
                         dot.node(node_id, formatted_label, shape=selected_shape, style="filled", fillcolor="#ccffcc", fontname=selected_font, fontsize="11", color="#006600")
-                    elif node_type == "root":
-                        dot.node(node_id, formatted_label, shape=selected_shape, style="filled", fillcolor="#2a5298", fontcolor="white", fontname=selected_font, fontsize="14", fontweight="bold", color="#1e3c72")
                     else:
                         dot.node(node_id, formatted_label, shape=selected_shape, fontname=selected_font, fontsize="12", color="#555555")
 
                 for parent, child in edges: 
                     dot.edge(parent, child, color="#888888")
 
-                # 產出數據流
                 png_data = dot.pipe(format='png')
                 pdf_data = dot.pipe(format='pdf')
                 svg_data = dot.pipe(format='svg')
