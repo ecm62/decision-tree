@@ -125,7 +125,7 @@ def format_label_wrap(text, width):
 # 介面配置與主程式邏輯
 # ==========================================
 st.set_page_config(page_title="專業決策樹生成器", layout="wide")
-st.title("專業決策結構生成系統")
+st.title("專業決策樹 Decision-tree (心智圖)生成器")
 
 col1, col2 = st.columns([1, 1.5])
 
