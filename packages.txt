@@ -1,2 +1,4 @@
 graphviz
 fonts-wqy-zenhei
+fonts-arphic-uming
+fonts-arphic-ukai
