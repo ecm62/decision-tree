@@ -10,7 +10,7 @@ import io
 # ==========================================
 # 介面基礎配置與高級 CSS 注入
 # ==========================================
-st.set_page_config(page_title="英俊的小羊 決策系統", page_icon="🐏", layout="wide")
+st.set_page_config(page_title="🐏 英俊的小羊 專業決策樹 Decision-tree (心智圖)生成器", page_icon="🐏", layout="wide")
 
 st.markdown("""
 <style>
