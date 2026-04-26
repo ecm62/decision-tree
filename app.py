@@ -200,8 +200,8 @@ with col2:
                 selected_font = font_map[font_choice]
 
                 # 動態產生 PS 文字
-                if color_mode == "智能分類上色 (對前一版不穩定文字的解法)":
-                    legend_text = "PS. 分類顏色依據：[紅色] 疾病/病理狀態 ｜ [綠色] 治療/處方方案 ｜ [灰色] 症狀/部位/分類"
+                if color_mode == "智能分類上色":
+                    legend_text = "PS. 分類顏色依據：[紅色] 狀態 ｜ [綠色] 處理｜ [灰色] 分類"
                 else:
                     legend_text = "PS. 分類顏色依據：[深藍] 核心目標 ｜ [綠框] 治療方案 ｜ [淺色] 階層節點"
 
@@ -238,7 +238,7 @@ with col2:
                         
                         attrs = {"fontname": selected_font, "fontsize": "12", "color": "#555555"}
                         
-                        if color_mode == "智能分類上色 (對前一版不穩定文字的解法)":
+                        if color_mode == "智能分類上色":
                             if node_type == "disease":
                                 attrs.update({"shape": "ellipse" if node_shape == "圓框" else "box", "style": "filled", "fillcolor": "#ffcccc", "color": "#cc0000"})
                             elif node_type == "treatment":
