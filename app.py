@@ -150,7 +150,7 @@ with col1:
         
         graph_title = st.text_area(
             "圖表標題 (列印於圖表頂部)", 
-            value="🐏 英俊的小羊\n專業決策樹 Decision-tree (心智圖)生成器", 
+            value="🐏心智圖:                ", 
             height=68
         )
         
