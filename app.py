@@ -85,7 +85,6 @@ def parse_mermaid(text):
 
 def parse_arrow_chain(text):
     nodes_dict, edges, label_to_id, node_counter = {}, [], {}, 0
-    node_depths = {}
 
     def get_or_create_node(label, depth):
         nonlocal node_counter
@@ -104,7 +103,6 @@ def parse_arrow_chain(text):
             elif any(kw in label_lower for kw in disease_kws): node_type = "disease"
             
             nodes_dict[node_id] = {"label": label, "type": node_type, "depth": depth}
-            node_depths[node_id] = depth
         return label_to_id[label]
 
     text = text.replace('->', '➔').replace('=>', '➔').replace('➡️', '➔')
@@ -148,9 +146,10 @@ with col1:
     with st.form("main_form", border=False):
         st.markdown("#### 📥 數據輸入區")
         
+        # 標題設定：預設已依照您的要求做斷行處理
         graph_title = st.text_area(
-            "圖表標題 (列印於圖表頂部)", 
-            value="🐏心智圖:                ", 
+            "圖表頂部標題", 
+            value="🐏心智圖                ", 
             height=68
         )
         
@@ -197,65 +196,67 @@ with col2:
                     "楷體 (傳統人文)": "AR PL UKai TW"
                 }
 
-                dot = graphviz.Digraph(format='png')
-                
                 selected_shape = shape_map[node_shape]
                 selected_font = font_map[font_choice]
+
+                # 動態產生 PS 文字
+                if color_mode == "智能分類上色 (對前一版不穩定文字的解法)":
+                    legend_text = "PS. 分類顏色依據：[紅色] 疾病/病理狀態 ｜ [綠色] 治療/處方方案 ｜ [灰色] 症狀/部位/分類"
+                else:
+                    legend_text = "PS. 分類顏色依據：[深藍] 核心目標 ｜ [綠框] 治療方案 ｜ [淺色] 階層節點"
+
+                dot = graphviz.Digraph(format='png')
                 
-                # 套用排版密度與頂部標題
+                # 根畫布設定：負責整體的排版方向與絕對底部的 PS 標籤
                 dot.attr(
                     rankdir=dir_map[direction], 
                     splines=line_map[line_style], 
                     nodesep=density_map[density]["nodesep"], 
                     ranksep=density_map[density]["ranksep"],
-                    label=graph_title,
-                    labelloc="t",
+                    label=legend_text,         # 將 PS 置於全域標籤
+                    labelloc="b",              # 強制定位於最底部 (bottom)
                     fontname=selected_font,
-                    fontsize="18",
-                    fontcolor="#1e3c72",
-                    fontweight="bold"
+                    fontsize="11",
+                    fontcolor="#888888"
                 )
                 
-                for node_id, data in nodes_dict.items():
-                    raw_label, node_type, depth = data["label"], data["type"], data["depth"]
-                    formatted_label = format_label_wrap(raw_label, int(wrap_width))
-                    
-                    attrs = {"fontname": selected_font, "fontsize": "12", "color": "#555555"}
-                    
-                    if color_mode == "智能分類上色 (對前一版不穩定文字的解法)":
-                        if node_type == "disease":
-                            attrs.update({"shape": "ellipse" if node_shape == "圓框" else "box", "style": "filled", "fillcolor": "#ffcccc", "color": "#cc0000"})
-                        elif node_type == "treatment":
-                            attrs.update({"shape": "box", "style": "filled", "fillcolor": "#ccffcc", "color": "#006600", "fontsize": "11"})
-                        else: attrs.update({"shape": selected_shape, "color": "#888888"})
+                # 利用隱藏外框的子圖 (Cluster)：負責裝載頂部的標題與所有圖形節點
+                with dot.subgraph(name='cluster_main') as c:
+                    c.attr(
+                        label=graph_title,
+                        labelloc="t",          # 強制定位於最頂部 (top)
+                        fontname=selected_font,
+                        fontsize="18",
+                        fontcolor="#1e3c72",
+                        fontweight="bold",
+                        color="none"           # 隱藏子圖的外框線
+                    )
+                
+                    for node_id, data in nodes_dict.items():
+                        raw_label, node_type, depth = data["label"], data["type"], data["depth"]
+                        formatted_label = format_label_wrap(raw_label, int(wrap_width))
                         
-                    elif color_mode == "層級統一上色 (專業版面首選)":
-                        if depth == 0:
-                            attrs.update({"shape": "box", "style": "filled", "fillcolor": "#2a5298", "fontcolor": "white", "fontsize": "14", "fontweight": "bold", "color": "#1e3c72"})
-                        elif node_type == "treatment":
-                            attrs.update({"shape": "box", "style": "rounded", "color": "#009900", "fontsize": "11", "fontcolor": "#006600"})
-                        else:
-                            bg_color = "#ffffff" if depth % 2 == 0 else "#f0f4f8"
-                            attrs.update({"shape": selected_shape, "style": "filled", "fillcolor": bg_color, "color": "#a0a0a0"})
-                    
-                    dot.node(node_id, formatted_label, **attrs)
+                        attrs = {"fontname": selected_font, "fontsize": "12", "color": "#555555"}
+                        
+                        if color_mode == "智能分類上色 (對前一版不穩定文字的解法)":
+                            if node_type == "disease":
+                                attrs.update({"shape": "ellipse" if node_shape == "圓框" else "box", "style": "filled", "fillcolor": "#ffcccc", "color": "#cc0000"})
+                            elif node_type == "treatment":
+                                attrs.update({"shape": "box", "style": "filled", "fillcolor": "#ccffcc", "color": "#006600", "fontsize": "11"})
+                            else: attrs.update({"shape": selected_shape, "color": "#888888"})
+                            
+                        elif color_mode == "層級統一上色 (專業版面首選)":
+                            if depth == 0:
+                                attrs.update({"shape": "box", "style": "filled", "fillcolor": "#2a5298", "fontcolor": "white", "fontsize": "14", "fontweight": "bold", "color": "#1e3c72"})
+                            elif node_type == "treatment":
+                                attrs.update({"shape": "box", "style": "rounded", "color": "#009900", "fontsize": "11", "fontcolor": "#006600"})
+                            else:
+                                bg_color = "#ffffff" if depth % 2 == 0 else "#f0f4f8"
+                                attrs.update({"shape": selected_shape, "style": "filled", "fillcolor": bg_color, "color": "#a0a0a0"})
+                        
+                        c.node(node_id, formatted_label, **attrs)
 
-                for parent, child in edges: dot.edge(parent, child, color="#888888")
-
-                # 生成底部 PS 顏色標註 (可裁切)
-                if color_mode == "智能分類上色 (對前一版不穩定文字的解法)":
-                    legend_text = "PS. 分類顏色依據：[紅色] 疾病/病理狀態 ｜ [綠色] 治療/處方方案 ｜ [灰色] 症狀/部位/分類"
-                else:
-                    legend_text = "PS. 分類顏色依據：[深藍] 核心目標 ｜ [綠框] 治療方案 ｜ [淺色] 階層節點"
-                
-                dot.node("LEGEND_PS", legend_text, shape="note", style="filled", fillcolor="#fbfbfb", color="#cccccc", fontcolor="#666666", fontname=selected_font, fontsize="10")
-                
-                # 將底部標註強制推至末端
-                leaf_nodes = [n for n in nodes_dict.keys() if n not in [p for p, c in edges]]
-                if not leaf_nodes and nodes_dict:
-                    leaf_nodes = [list(nodes_dict.keys())[0]]
-                for leaf in leaf_nodes:
-                    dot.edge(leaf, "LEGEND_PS", style="invis")
+                    for parent, child in edges: c.edge(parent, child, color="#888888")
 
                 # 產出數據流
                 png_data = dot.pipe(format='png')
