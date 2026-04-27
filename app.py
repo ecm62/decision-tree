@@ -7,6 +7,7 @@ import re
 import textwrap
 import io
 import os
+import html # [新增] 引入標準安全編碼模組
 
 # ==========================================
 # 介面基礎配置與高級 CSS 注入
@@ -163,7 +164,7 @@ with col1:
         
         graph_title = st.text_area(
             "圖表頂部標題", 
-            value="心智圖                   ", 
+            value="心智圖標題輸入處              ", 
             height=68
         )
         
@@ -220,13 +221,13 @@ with col2:
                 selected_font = font_map[font_choice]
 
                 if color_mode == "智能分類上色 (動態層級漸層版)":
-                    legend_text = "PS. 顏色依據：[深色白字] 起點 ｜ [紅色系] 類別｜ [綠色系] 治療 ｜ [灰白漸層] 分類"
+                    legend_text = "PS. 顏色依據：[深色白字] 起點 ｜ [紅色系] 類別 ｜ [綠色系] 方案 ｜ [灰白漸層] 分類"
                 elif color_mode == "層級統一上色 (專業版面首選)":
-                    legend_text = "PS. 顏色依據：[深藍] 起點 ｜ [綠框] 方案 ｜ [淺色] 階層"
+                    legend_text = "PS. 顏色依據：[深藍] 起點 ｜ [綠框] 方案 ｜ [淺色] 節點"
                 elif color_mode == "企業冷色調 (高階 SOP 專用)":
-                    legend_text = "PS. 顏色依據：[深青] 起點 ｜ [冷綠] 方案 ｜ [冷藍灰漸層] 階層"
+                    legend_text = "PS. 顏色依據：[深青] 起點 ｜ [冷綠] 方案 ｜ [冷藍灰漸層] 節點"
                 elif color_mode == "高對比警戒 (異常排查與警示)":
-                    legend_text = "PS. 顏色依據：[極黑底黃字] 起點 ｜ [警示橘] 排查 ｜ 適合類別追蹤"
+                    legend_text = "PS. 顏色依據：[極黑底黃字] 起點 ｜ [警示橘] 節點 ｜ 適合分類與追蹤"
                 elif color_mode == "極簡學術灰階 (黑白列印/論文專用)":
                     legend_text = "PS. 顏色依據：[黑底白字] 起點 ｜ [虛線框] 方案 ｜ 確保黑白列印不失真"
 
@@ -244,7 +245,12 @@ with col2:
                     fontcolor="#888888"
                 )
                 
-                safe_title_html = graph_title.replace('\n', '<BR/>')
+                # ==========================================
+                # [核心修正] HTML 標題安全性消毒過濾
+                # ==========================================
+                # 強制跳脫破壞性字元 (如 <, >, &)，避免系統誤判導致 CalledProcessError
+                escaped_title = html.escape(graph_title)
+                safe_title_html = escaped_title.replace('\n', '<BR/>')
                 
                 if os.path.exists("logo.png"):
                     html_label = f'<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0"><TR><TD><IMG SRC="logo.png"/></TD><TD ALIGN="CENTER"><FONT FACE="{selected_font}" POINT-SIZE="18" COLOR="#1e3c72"><B>{safe_title_html}</B></FONT></TD></TR></TABLE>>'
@@ -345,18 +351,14 @@ with col2:
                 st.markdown("---")
                 st.markdown("#### 📤 專業報告與原始檔匯出")
                 
-                # ==========================================
-                # 檔名動態生成與作業系統限制淨化處理
-                # ==========================================
-                safe_filename = re.sub(r'[\\/*?:"<>|\n\r]', '_', graph_title)  # 替換換行與作業系統禁用符號
-                safe_filename = re.sub(r'_+', '_', safe_filename).strip('_') # 壓縮連續的底線並去除頭尾底線
+                safe_filename = re.sub(r'[\\/*?:"<>|\n\r]', '_', graph_title)
+                safe_filename = re.sub(r'_+', '_', safe_filename).strip('_')
                 if not safe_filename: 
-                    safe_filename = "Decision_Tree" # 若被刪除到為空，提供預設值防呆
+                    safe_filename = "Decision_Tree"
                 
                 d_col1, d_col2, d_col3 = st.columns(3)
                 d_col4, d_col5, d_col6 = st.columns(3)
                 
-                # 套用動態檔名至所有下載按鈕
                 d_col1.download_button("📄 PDF 高清報告", data=pdf_data, file_name=f"{safe_filename}.pdf", mime="application/pdf", use_container_width=True)
                 d_col2.download_button("🖼️ PNG 高畫質圖", data=png_data, file_name=f"{safe_filename}.png", mime="image/png", use_container_width=True)
                 d_col3.download_button("📐 SVG 向量圖", data=svg_data, file_name=f"{safe_filename}.svg", mime="image/svg+xml", use_container_width=True)
