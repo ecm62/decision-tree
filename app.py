@@ -108,7 +108,7 @@ def parse_arrow_chain(text):
 
     text = text.replace('->', '➔').replace('=>', '➔').replace('➡️', '➔')
     
-    current_category_id = None  # 狀態記憶機制：記錄當下的大分類標題
+    current_category_id = None  
 
     for line in text.strip().split('\n'):
         line = line.strip()
@@ -122,24 +122,20 @@ def parse_arrow_chain(text):
                 lbl = parts[i].strip()
                 if not lbl: continue
                 
-                # 深度邏輯：如果有大標題，第一層就是 depth=1。若無大標題，則從 depth=0 開始。
                 base_depth = 1 if current_category_id else 0
                 current_depth = base_depth + i
                 
                 n_id = get_or_create_node(lbl, depth=current_depth)
                 chain_nodes.append(n_id)
             
-            # 將大標題與鏈條的第一個節點自動連線
             if current_category_id and chain_nodes:
                 if (current_category_id, chain_nodes[0]) not in edges:
                     edges.append((current_category_id, chain_nodes[0]))
             
-            # 鏈條內部的依序連線
             for i in range(len(chain_nodes) - 1):
                 if (chain_nodes[i], chain_nodes[i+1]) not in edges:
                     edges.append((chain_nodes[i], chain_nodes[i+1]))
         else: 
-            # 獨立成行的文字視為最高階大標題 (Depth = 0)
             current_category_id = get_or_create_node(line, depth=0)
 
     return nodes_dict, edges
@@ -167,7 +163,7 @@ with col1:
         
         graph_title = st.text_area(
             "圖表頂部標題", 
-            value="心智圖:              ", 
+            value="心智圖                   ", 
             height=68
         )
         
@@ -224,15 +220,15 @@ with col2:
                 selected_font = font_map[font_choice]
 
                 if color_mode == "智能分類上色 (動態層級漸層版)":
-                    legend_text = "PS. 顏色依據：[深色白字] 起始點/大標題 ｜ [紅色系] 疾病 ｜ [綠色系] 治療 ｜ [灰白漸層] 器官分類"
+                    legend_text = "PS. 顏色依據：[深色白字] 起點 ｜ [紅色系] 類別｜ [綠色系] 治療 ｜ [灰白漸層] 分類"
                 elif color_mode == "層級統一上色 (專業版面首選)":
-                    legend_text = "PS. 顏色依據：[深藍] 起始點/大標題 ｜ [綠框] 治療方案 ｜ [淺色] 階層節點"
+                    legend_text = "PS. 顏色依據：[深藍] 起點 ｜ [綠框] 方案 ｜ [淺色] 階層"
                 elif color_mode == "企業冷色調 (高階 SOP 專用)":
-                    legend_text = "PS. 顏色依據：[深青] 起始點/大標題 ｜ [冷綠] 治療方案 ｜ [冷藍灰漸層] 階層節點"
+                    legend_text = "PS. 顏色依據：[深青] 起點 ｜ [冷綠] 方案 ｜ [冷藍灰漸層] 階層"
                 elif color_mode == "高對比警戒 (異常排查與警示)":
-                    legend_text = "PS. 顏色依據：[極黑底黃字] 起始點/大標題 ｜ [警示橘] 排查節點 ｜ 適合疾病與耗損追蹤"
+                    legend_text = "PS. 顏色依據：[極黑底黃字] 起點 ｜ [警示橘] 排查 ｜ 適合類別追蹤"
                 elif color_mode == "極簡學術灰階 (黑白列印/論文專用)":
-                    legend_text = "PS. 顏色依據：[黑底白字] 起始點/大標題 ｜ [虛線框] 治療方案 ｜ 確保黑白列印不失真"
+                    legend_text = "PS. 顏色依據：[黑底白字] 起點 ｜ [虛線框] 方案 ｜ 確保黑白列印不失真"
 
                 dot = graphviz.Digraph(format='png')
                 
@@ -248,12 +244,12 @@ with col2:
                     fontcolor="#888888"
                 )
                 
-                safe_title = graph_title.replace('\n', '<BR/>')
+                safe_title_html = graph_title.replace('\n', '<BR/>')
                 
                 if os.path.exists("logo.png"):
-                    html_label = f'<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0"><TR><TD><IMG SRC="logo.png"/></TD><TD ALIGN="CENTER"><FONT FACE="{selected_font}" POINT-SIZE="18" COLOR="#1e3c72"><B>{safe_title}</B></FONT></TD></TR></TABLE>>'
+                    html_label = f'<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0"><TR><TD><IMG SRC="logo.png"/></TD><TD ALIGN="CENTER"><FONT FACE="{selected_font}" POINT-SIZE="18" COLOR="#1e3c72"><B>{safe_title_html}</B></FONT></TD></TR></TABLE>>'
                 else:
-                    html_label = f'<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0"><TR><TD ALIGN="CENTER"><FONT FACE="{selected_font}" POINT-SIZE="18" COLOR="#1e3c72"><B>{safe_title}</B></FONT></TD></TR></TABLE>>'
+                    html_label = f'<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0"><TR><TD ALIGN="CENTER"><FONT FACE="{selected_font}" POINT-SIZE="18" COLOR="#1e3c72"><B>{safe_title_html}</B></FONT></TD></TR></TABLE>>'
 
                 with dot.subgraph(name='cluster_main') as c:
                     c.attr(
@@ -349,15 +345,24 @@ with col2:
                 st.markdown("---")
                 st.markdown("#### 📤 專業報告與原始檔匯出")
                 
+                # ==========================================
+                # 檔名動態生成與作業系統限制淨化處理
+                # ==========================================
+                safe_filename = re.sub(r'[\\/*?:"<>|\n\r]', '_', graph_title)  # 替換換行與作業系統禁用符號
+                safe_filename = re.sub(r'_+', '_', safe_filename).strip('_') # 壓縮連續的底線並去除頭尾底線
+                if not safe_filename: 
+                    safe_filename = "Decision_Tree" # 若被刪除到為空，提供預設值防呆
+                
                 d_col1, d_col2, d_col3 = st.columns(3)
                 d_col4, d_col5, d_col6 = st.columns(3)
                 
-                d_col1.download_button("📄 PDF 高清報告", data=pdf_data, file_name="Decision_Tree.pdf", mime="application/pdf", use_container_width=True)
-                d_col2.download_button("🖼️ PNG 高畫質圖", data=png_data, file_name="Decision_Tree.png", mime="image/png", use_container_width=True)
-                d_col3.download_button("📐 SVG 向量圖", data=svg_data, file_name="Decision_Tree.svg", mime="image/svg+xml", use_container_width=True)
+                # 套用動態檔名至所有下載按鈕
+                d_col1.download_button("📄 PDF 高清報告", data=pdf_data, file_name=f"{safe_filename}.pdf", mime="application/pdf", use_container_width=True)
+                d_col2.download_button("🖼️ PNG 高畫質圖", data=png_data, file_name=f"{safe_filename}.png", mime="image/png", use_container_width=True)
+                d_col3.download_button("📐 SVG 向量圖", data=svg_data, file_name=f"{safe_filename}.svg", mime="image/svg+xml", use_container_width=True)
                 
-                d_col4.download_button("📝 WORD 編輯檔", data=docx_output.getvalue(), file_name="Decision_Tree.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", use_container_width=True)
-                d_col5.download_button("📊 EXCEL 關聯表", data=excel_output.getvalue(), file_name="Decision_Tree.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
-                d_col6.download_button("💻 MD 原始文字", data=md_data, file_name="Decision_Tree.md", mime="text/markdown", use_container_width=True)
+                d_col4.download_button("📝 WORD 編輯檔", data=docx_output.getvalue(), file_name=f"{safe_filename}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", use_container_width=True)
+                d_col5.download_button("📊 EXCEL 關聯表", data=excel_output.getvalue(), file_name=f"{safe_filename}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+                d_col6.download_button("💻 MD 原始文字", data=md_data, file_name=f"{safe_filename}.md", mime="text/markdown", use_container_width=True)
     else:
         st.info("💡 系統閒置中。請於左側輸入數據並點擊「🚀 執行智能分析與生成」按鈕以檢視圖形。")
