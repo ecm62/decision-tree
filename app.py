@@ -108,28 +108,45 @@ def parse_arrow_chain(text):
 
     text = text.replace('->', '➔').replace('=>', '➔').replace('➡️', '➔')
     
+    current_category_id = None  # 狀態記憶機制：記錄當下的大分類標題
+
     for line in text.strip().split('\n'):
         line = line.strip()
         if not line: continue
         
         if '➔' in line:
             parts = line.split('➔')
-            for i in range(len(parts) - 1):
-                p_label, c_label = parts[i].strip(), parts[i+1].strip()
-                if not p_label or not c_label: continue
+            chain_nodes = []
+            
+            for i in range(len(parts)):
+                lbl = parts[i].strip()
+                if not lbl: continue
                 
-                p_id = get_or_create_node(p_label, depth=i)
-                c_id = get_or_create_node(c_label, depth=i+1)
+                # 深度邏輯：如果有大標題，第一層就是 depth=1。若無大標題，則從 depth=0 開始。
+                base_depth = 1 if current_category_id else 0
+                current_depth = base_depth + i
                 
-                if (p_id, c_id) not in edges: edges.append((p_id, c_id))
+                n_id = get_or_create_node(lbl, depth=current_depth)
+                chain_nodes.append(n_id)
+            
+            # 將大標題與鏈條的第一個節點自動連線
+            if current_category_id and chain_nodes:
+                if (current_category_id, chain_nodes[0]) not in edges:
+                    edges.append((current_category_id, chain_nodes[0]))
+            
+            # 鏈條內部的依序連線
+            for i in range(len(chain_nodes) - 1):
+                if (chain_nodes[i], chain_nodes[i+1]) not in edges:
+                    edges.append((chain_nodes[i], chain_nodes[i+1]))
         else: 
-            get_or_create_node(line, depth=0)
+            # 獨立成行的文字視為最高階大標題 (Depth = 0)
+            current_category_id = get_or_create_node(line, depth=0)
 
     return nodes_dict, edges
 
 def auto_detect_and_parse(text):
     if '-->' in text or 'graph LR' in text or 'graph TB' in text: return parse_mermaid(text), "Mermaid 語法模式"
-    elif '➔' in text or '->' in text: return parse_arrow_chain(text), "連續推演引擎 (智能語意)"
+    elif '➔' in text or '->' in text: return parse_arrow_chain(text), "連續推演引擎 (具備大標題記憶)"
     else: return parse_indentation(text), "空白縮排模式"
 
 def format_label_wrap(text, width):
@@ -150,7 +167,7 @@ with col1:
         
         graph_title = st.text_area(
             "圖表頂部標題", 
-            value="心智圖           ", 
+            value="心智圖:              ", 
             height=68
         )
         
@@ -206,17 +223,16 @@ with col2:
                 selected_shape = shape_map[node_shape]
                 selected_font = font_map[font_choice]
 
-                # 動態產生 PS 文字說明
                 if color_mode == "智能分類上色 (動態層級漸層版)":
-                    legend_text = "PS. 顏色依據：[深色白字] 起始點 ｜ [紅色系] 疾病 ｜ [綠色系] 方案 ｜ [灰白漸層] 分類"
+                    legend_text = "PS. 顏色依據：[深色白字] 起始點/大標題 ｜ [紅色系] 疾病 ｜ [綠色系] 治療 ｜ [灰白漸層] 器官分類"
                 elif color_mode == "層級統一上色 (專業版面首選)":
-                    legend_text = "PS. 顏色依據：[深藍] 起始點 ｜ [綠框] 方案 ｜ [淺色] 階層節點"
+                    legend_text = "PS. 顏色依據：[深藍] 起始點/大標題 ｜ [綠框] 治療方案 ｜ [淺色] 階層節點"
                 elif color_mode == "企業冷色調 (高階 SOP 專用)":
-                    legend_text = "PS. 顏色依據：[深青] 起始點 ｜ [冷綠] 方案 ｜ [冷藍灰漸層] 階層節點"
+                    legend_text = "PS. 顏色依據：[深青] 起始點/大標題 ｜ [冷綠] 治療方案 ｜ [冷藍灰漸層] 階層節點"
                 elif color_mode == "高對比警戒 (異常排查與警示)":
-                    legend_text = "PS. 顏色依據：[極黑底黃字] 起始點 ｜ [警示橘] 排查節點 ｜ 適合疾病與耗損追蹤"
+                    legend_text = "PS. 顏色依據：[極黑底黃字] 起始點/大標題 ｜ [警示橘] 排查節點 ｜ 適合疾病與耗損追蹤"
                 elif color_mode == "極簡學術灰階 (黑白列印/論文專用)":
-                    legend_text = "PS. 顏色依據：[黑底白字] 起始點 ｜ [虛線框] 方案 ｜ 確保黑白列印不失真"
+                    legend_text = "PS. 顏色依據：[黑底白字] 起始點/大標題 ｜ [虛線框] 治療方案 ｜ 確保黑白列印不失真"
 
                 dot = graphviz.Digraph(format='png')
                 
@@ -232,15 +248,11 @@ with col2:
                     fontcolor="#888888"
                 )
                 
-                # HTML 標題與 LOGO 渲染引擎
-                # 將純文字換行轉換為 HTML 的 <BR/>，並判斷檔案庫中是否有 logo.png
                 safe_title = graph_title.replace('\n', '<BR/>')
                 
                 if os.path.exists("logo.png"):
-                    # 若檔案存在，運用 HTML Table 技術將 LOGO 完美貼齊於標題左側
                     html_label = f'<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0"><TR><TD><IMG SRC="logo.png"/></TD><TD ALIGN="CENTER"><FONT FACE="{selected_font}" POINT-SIZE="18" COLOR="#1e3c72"><B>{safe_title}</B></FONT></TD></TR></TABLE>>'
                 else:
-                    # 容錯機制：若您忘記上傳，系統自動降級為純文字標題，避免當機
                     html_label = f'<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0"><TR><TD ALIGN="CENTER"><FONT FACE="{selected_font}" POINT-SIZE="18" COLOR="#1e3c72"><B>{safe_title}</B></FONT></TD></TR></TABLE>>'
 
                 with dot.subgraph(name='cluster_main') as c:
@@ -260,9 +272,7 @@ with col2:
                         
                         if color_mode == "智能分類上色 (動態層級漸層版)":
                             if depth == 0:
-                                if node_type == "disease": attrs.update({"shape": "box", "style": "filled,rounded", "fillcolor": "#c0392b", "color": "#922b21", "fontcolor": "white", "fontweight": "bold", "fontsize": "14"})
-                                elif node_type == "treatment": attrs.update({"shape": "box", "style": "filled,rounded", "fillcolor": "#27ae60", "color": "#1d8348", "fontcolor": "white", "fontweight": "bold", "fontsize": "14"})
-                                else: attrs.update({"shape": "box", "style": "filled,rounded", "fillcolor": "#34495e", "color": "#2c3e50", "fontcolor": "white", "fontweight": "bold", "fontsize": "14"})
+                                attrs.update({"shape": "box", "style": "filled,rounded", "fillcolor": "#2c3e50", "color": "#1a252f", "fontcolor": "white", "fontweight": "bold", "fontsize": "14"})
                             else:
                                 if node_type == "disease":
                                     fill = "#fdedec" if is_even_depth else "#fadbd8"
