@@ -6,11 +6,12 @@ from docx.shared import Inches
 import re
 import textwrap
 import io
+import os
 
 # ==========================================
 # 介面基礎配置與高級 CSS 注入
 # ==========================================
-st.set_page_config(page_title="英俊的小羊 心智圖製作", page_icon="🐏", layout="wide")
+st.set_page_config(page_title="英俊的小羊心智圖製作", page_icon="🐏", layout="wide")
 
 st.markdown("""
 <style>
@@ -149,7 +150,7 @@ with col1:
         
         graph_title = st.text_area(
             "圖表頂部標題", 
-            value="🐏 英俊的小羊 專業決策樹 Decision-tree (心智圖)生成器", 
+            value="心智圖           ", 
             height=68
         )
         
@@ -205,8 +206,9 @@ with col2:
                 selected_shape = shape_map[node_shape]
                 selected_font = font_map[font_choice]
 
+                # 動態產生 PS 文字說明
                 if color_mode == "智能分類上色 (動態層級漸層版)":
-                    legend_text = "PS. 顏色依據：[深色白字] 起始點 ｜ [紅色系] 類別 ｜ [綠色系] 治療 ｜ [灰白漸層] 分類"
+                    legend_text = "PS. 顏色依據：[深色白字] 起始點 ｜ [紅色系] 疾病 ｜ [綠色系] 方案 ｜ [灰白漸層] 分類"
                 elif color_mode == "層級統一上色 (專業版面首選)":
                     legend_text = "PS. 顏色依據：[深藍] 起始點 ｜ [綠框] 方案 ｜ [淺色] 階層節點"
                 elif color_mode == "企業冷色調 (高階 SOP 專用)":
@@ -230,14 +232,21 @@ with col2:
                     fontcolor="#888888"
                 )
                 
+                # HTML 標題與 LOGO 渲染引擎
+                # 將純文字換行轉換為 HTML 的 <BR/>，並判斷檔案庫中是否有 logo.png
+                safe_title = graph_title.replace('\n', '<BR/>')
+                
+                if os.path.exists("logo.png"):
+                    # 若檔案存在，運用 HTML Table 技術將 LOGO 完美貼齊於標題左側
+                    html_label = f'<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0"><TR><TD><IMG SRC="logo.png"/></TD><TD ALIGN="CENTER"><FONT FACE="{selected_font}" POINT-SIZE="18" COLOR="#1e3c72"><B>{safe_title}</B></FONT></TD></TR></TABLE>>'
+                else:
+                    # 容錯機制：若您忘記上傳，系統自動降級為純文字標題，避免當機
+                    html_label = f'<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0"><TR><TD ALIGN="CENTER"><FONT FACE="{selected_font}" POINT-SIZE="18" COLOR="#1e3c72"><B>{safe_title}</B></FONT></TD></TR></TABLE>>'
+
                 with dot.subgraph(name='cluster_main') as c:
                     c.attr(
-                        label=graph_title,
+                        label=html_label,
                         labelloc="t",          
-                        fontname=selected_font,
-                        fontsize="18",
-                        fontcolor="#1e3c72",
-                        fontweight="bold",
                         color="none"           
                     )
                 
