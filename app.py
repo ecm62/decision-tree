@@ -10,7 +10,7 @@ import io
 # ==========================================
 # 介面基礎配置與高級 CSS 注入
 # ==========================================
-st.set_page_config(page_title="英俊的小羊心智圖", page_icon="🐏", layout="wide")
+st.set_page_config(page_title="英俊的小羊 心智圖製作", page_icon="🐏", layout="wide")
 
 st.markdown("""
 <style>
@@ -39,7 +39,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 核心解析引擎庫 (已擴充通用商業語意)
+# 核心解析引擎庫
 # ==========================================
 def parse_indentation(text):
     nodes_dict, edges, stack, node_counter = {}, [], [], 0
@@ -95,9 +95,8 @@ def parse_arrow_chain(text):
             label_to_id[label] = node_id
             
             node_type = "standard"
-            # 泛用化擴充：加入管理學、通用異常與商業行動詞彙
-            disease_kws = ["病", "炎", "症", "感染", "異常", "問題", "風險", "警告", "失敗", "osis", "itis", "syndrome", "error", "warning", "risk", "fail"]
-            treatment_kws = ["治療", "首選", "次選", "對策", "方案", "解決", "行動", "執行", "1st:", "2nd:", "藥", "支持", "action", "solution", "execute", "plan"]
+            disease_kws = ["病", "炎", "症", "感染", "osis", "itis", "syndrome", "fever", "virus", "bacteria"]
+            treatment_kws = ["治療", "首選", "次選", "1st:", "2nd:", "penicillin", "mycin", "sporin", "藥", "支持", "support", "vaccine"]
             
             label_lower = label.lower()
             if any(kw in label_lower for kw in treatment_kws): node_type = "treatment"
@@ -150,11 +149,11 @@ with col1:
         
         graph_title = st.text_area(
             "圖表頂部標題", 
-            value=" 心智圖                  ", 
+            value="🐏 英俊的小羊 專業決策樹 Decision-tree (心智圖)生成器", 
             height=68
         )
         
-        input_text = st.text_area("結構文字 (支援：連續箭頭 A ➔ B ➔ C / 縮排 / Mermaid)", height=250, placeholder="支援多領域應用：\n臨床：豬藍耳病 ➔ 呼吸急促 ➔ 抗生素治療\n管理：產量異常 ➔ 檢查環境溫度 ➔ 調整通風方案")
+        input_text = st.text_area("結構文字 (若要設定大標題，請獨立換行輸入即可)", height=250, placeholder="例如：\n呼吸道疾病類別\n豬藍耳病 ➔ 呼吸急促 ➔ 抗生素治療")
         
         with st.expander("⚙️ 進階渲染與上色參數設定", expanded=True):
             color_mode = st.selectbox("選擇上色模式", [
@@ -185,7 +184,7 @@ with col2:
         if not input_text.strip():
             st.warning("⚠️ 請先在左側輸入文字數據。")
         else:
-            with st.spinner("系統正在進行邏輯結構解析與專業級渲染..."):
+            with st.spinner("系統正在進行病理結構解析與專業級渲染..."):
                 (nodes_dict, edges), detected_mode = auto_detect_and_parse(text=input_text)
                 st.success(f"✓ 數據解析成功 | 系統判定格式：**{detected_mode}**")
 
@@ -206,12 +205,140 @@ with col2:
                 selected_shape = shape_map[node_shape]
                 selected_font = font_map[font_choice]
 
-                # ==========================
-                # 泛用化 PS 標籤文字 (不侷限疾病)
-                # ==========================
                 if color_mode == "智能分類上色 (動態層級漸層版)":
-                    legend_text = "PS. 視覺邏輯：[重色塊] 根節點/大標題 ｜ [暖色/紅色系] 異常/問題/警示/病理 ｜ [冷色/綠色系] 對策/方案/行動/治療 ｜ [灰白漸層] 一般結構與節點"
+                    legend_text = "PS. 顏色依據：[深色白字] 起始點 ｜ [紅色系] 類別 ｜ [綠色系] 治療 ｜ [灰白漸層] 分類"
                 elif color_mode == "層級統一上色 (專業版面首選)":
-                    legend_text = "PS. 視覺邏輯：[深藍色] 核心主題/大標題 ｜ [強調框線] 關鍵對策與行動 ｜ [淺色背景] 一般層次結構"
+                    legend_text = "PS. 顏色依據：[深藍] 起始點 ｜ [綠框] 方案 ｜ [淺色] 階層節點"
                 elif color_mode == "企業冷色調 (高階 SOP 專用)":
-                    legend_text = "PS. 視覺邏輯：[深青色] 核心主題 ｜ [冷
+                    legend_text = "PS. 顏色依據：[深青] 起始點 ｜ [冷綠] 方案 ｜ [冷藍灰漸層] 階層節點"
+                elif color_mode == "高對比警戒 (異常排查與警示)":
+                    legend_text = "PS. 顏色依據：[極黑底黃字] 起始點 ｜ [警示橘] 排查節點 ｜ 適合疾病與耗損追蹤"
+                elif color_mode == "極簡學術灰階 (黑白列印/論文專用)":
+                    legend_text = "PS. 顏色依據：[黑底白字] 起始點 ｜ [虛線框] 方案 ｜ 確保黑白列印不失真"
+
+                dot = graphviz.Digraph(format='png')
+                
+                dot.attr(
+                    rankdir=dir_map[direction], 
+                    splines=line_map[line_style], 
+                    nodesep=density_map[density]["nodesep"], 
+                    ranksep=density_map[density]["ranksep"],
+                    label=legend_text,         
+                    labelloc="b",              
+                    fontname=selected_font,
+                    fontsize="11",
+                    fontcolor="#888888"
+                )
+                
+                with dot.subgraph(name='cluster_main') as c:
+                    c.attr(
+                        label=graph_title,
+                        labelloc="t",          
+                        fontname=selected_font,
+                        fontsize="18",
+                        fontcolor="#1e3c72",
+                        fontweight="bold",
+                        color="none"           
+                    )
+                
+                    for node_id, data in nodes_dict.items():
+                        raw_label, node_type, depth = data["label"], data["type"], data["depth"]
+                        formatted_label = format_label_wrap(raw_label, int(wrap_width))
+                        
+                        attrs = {"fontname": selected_font, "fontsize": "12", "color": "#555555"}
+                        act_shape = selected_shape if selected_shape != "plaintext" else "box"
+                        is_even_depth = (depth % 2 == 0)
+                        
+                        if color_mode == "智能分類上色 (動態層級漸層版)":
+                            if depth == 0:
+                                if node_type == "disease": attrs.update({"shape": "box", "style": "filled,rounded", "fillcolor": "#c0392b", "color": "#922b21", "fontcolor": "white", "fontweight": "bold", "fontsize": "14"})
+                                elif node_type == "treatment": attrs.update({"shape": "box", "style": "filled,rounded", "fillcolor": "#27ae60", "color": "#1d8348", "fontcolor": "white", "fontweight": "bold", "fontsize": "14"})
+                                else: attrs.update({"shape": "box", "style": "filled,rounded", "fillcolor": "#34495e", "color": "#2c3e50", "fontcolor": "white", "fontweight": "bold", "fontsize": "14"})
+                            else:
+                                if node_type == "disease":
+                                    fill = "#fdedec" if is_even_depth else "#fadbd8"
+                                    attrs.update({"shape": act_shape, "style": "filled,rounded", "fillcolor": fill, "color": "#e74c3c", "fontcolor": "#78281f"})
+                                elif node_type == "treatment":
+                                    fill = "#eafaf1" if is_even_depth else "#d5f5e3"
+                                    attrs.update({"shape": act_shape, "style": "filled,rounded", "fillcolor": fill, "color": "#2ecc71", "fontcolor": "#186a3b", "fontsize": "11"})
+                                else:
+                                    fill = "#ebedef" if is_even_depth else "#fdfefe"
+                                    attrs.update({"shape": selected_shape, "style": "filled,rounded", "fillcolor": fill, "color": "#bdc3c7", "fontcolor": "#2c3e50"})
+                                    
+                        elif color_mode == "層級統一上色 (專業版面首選)":
+                            if depth == 0:
+                                attrs.update({"shape": "box", "style": "filled,rounded", "fillcolor": "#2a5298", "fontcolor": "white", "fontsize": "14", "fontweight": "bold", "color": "#1e3c72"})
+                            elif node_type == "treatment":
+                                attrs.update({"shape": "box", "style": "rounded", "color": "#009900", "fontsize": "11", "fontcolor": "#006600"})
+                            else:
+                                bg_color = "#ffffff" if is_even_depth else "#f0f4f8"
+                                attrs.update({"shape": selected_shape, "style": "filled,rounded", "fillcolor": bg_color, "color": "#a0a0a0"})
+                                
+                        elif color_mode == "企業冷色調 (高階 SOP 專用)":
+                            if depth == 0:
+                                attrs.update({"shape": "box", "style": "filled,rounded", "fillcolor": "#117864", "color": "#0b5345", "fontcolor": "white", "fontweight": "bold", "fontsize": "14"})
+                            elif node_type == "treatment":
+                                attrs.update({"shape": "box", "style": "rounded", "color": "#17a589", "fontsize": "11", "fontcolor": "#0e6251"})
+                            else:
+                                fill = "#e8f8f5" if is_even_depth else "#ebedef"
+                                attrs.update({"shape": selected_shape, "style": "filled,rounded", "fillcolor": fill, "color": "#aeb6bf", "fontcolor": "#212f3d"})
+                                
+                        elif color_mode == "高對比警戒 (異常排查與警示)":
+                            if depth == 0:
+                                attrs.update({"shape": "box", "style": "filled,rounded", "fillcolor": "#17202a", "color": "#000000", "fontcolor": "#f1c40f", "fontweight": "bold", "fontsize": "14"})
+                            elif node_type == "treatment":
+                                attrs.update({"shape": "box", "style": "filled,rounded", "fillcolor": "#fef9e7", "color": "#f39c12", "fontcolor": "#d68910", "fontsize": "11"})
+                            else:
+                                fill = "#fdf2e9" if is_even_depth else "#fbeee6"
+                                attrs.update({"shape": selected_shape, "style": "filled,rounded", "fillcolor": fill, "color": "#e67e22", "fontcolor": "#873600"})
+                                
+                        elif color_mode == "極簡學術灰階 (黑白列印/論文專用)":
+                            if depth == 0:
+                                attrs.update({"shape": "box", "style": "filled,rounded", "fillcolor": "#333333", "color": "#000000", "fontcolor": "white", "fontweight": "bold", "fontsize": "14"})
+                            elif node_type == "treatment":
+                                attrs.update({"shape": "box", "style": "dashed,rounded", "fillcolor": "none", "color": "#000000", "fontcolor": "#000000", "fontsize": "11"})
+                            else:
+                                fill = "#ffffff" if is_even_depth else "#f2f2f2"
+                                attrs.update({"shape": selected_shape, "style": "filled,rounded", "fillcolor": fill, "color": "#666666", "fontcolor": "#000000"})
+                        
+                        c.node(node_id, formatted_label, **attrs)
+
+                    for parent, child in edges: c.edge(parent, child, color="#888888")
+
+                # 產出數據流
+                png_data = dot.pipe(format='png')
+                pdf_data = dot.pipe(format='pdf')
+                svg_data = dot.pipe(format='svg')
+                
+                st.image(png_data, use_container_width=True)
+                
+                doc = Document()
+                doc.add_heading(f'決策分析結構 ({detected_mode})', 0)
+                doc.add_picture(io.BytesIO(png_data), width=Inches(6.5))
+                doc.add_heading('原始數據記錄', level=1)
+                for line in input_text.strip().split('\n'): doc.add_paragraph(line)
+                docx_output = io.BytesIO()
+                doc.save(docx_output)
+                
+                readable_edges = [(nodes_dict[p]["label"].replace('\n', ' '), nodes_dict[c]["label"].replace('\n', ' ')) for p, c in edges]
+                df = pd.DataFrame(readable_edges, columns=["上層節點", "下層節點"])
+                excel_output = io.BytesIO()
+                df.to_excel(excel_output, index=False)
+                
+                md_data = f"# 決策結構數據 ({detected_mode})\n\n```text\n{input_text.strip()}\n```".encode('utf-8')
+
+                st.markdown("---")
+                st.markdown("#### 📤 專業報告與原始檔匯出")
+                
+                d_col1, d_col2, d_col3 = st.columns(3)
+                d_col4, d_col5, d_col6 = st.columns(3)
+                
+                d_col1.download_button("📄 PDF 高清報告", data=pdf_data, file_name="Decision_Tree.pdf", mime="application/pdf", use_container_width=True)
+                d_col2.download_button("🖼️ PNG 高畫質圖", data=png_data, file_name="Decision_Tree.png", mime="image/png", use_container_width=True)
+                d_col3.download_button("📐 SVG 向量圖", data=svg_data, file_name="Decision_Tree.svg", mime="image/svg+xml", use_container_width=True)
+                
+                d_col4.download_button("📝 WORD 編輯檔", data=docx_output.getvalue(), file_name="Decision_Tree.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", use_container_width=True)
+                d_col5.download_button("📊 EXCEL 關聯表", data=excel_output.getvalue(), file_name="Decision_Tree.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+                d_col6.download_button("💻 MD 原始文字", data=md_data, file_name="Decision_Tree.md", mime="text/markdown", use_container_width=True)
+    else:
+        st.info("💡 系統閒置中。請於左側輸入數據並點擊「🚀 執行智能分析與生成」按鈕以檢視圖形。")
